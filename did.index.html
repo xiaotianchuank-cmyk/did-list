@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Didリスト</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #f0f4f8; min-height: 100vh; }
+    .app { max-width: 420px; margin: 0 auto; padding: 1rem; }
+    .header { text-align: center; padding: 1rem 0 1.5rem; }
+    .header h1 { font-size: 22px; font-weight: 500; color: #222; }
+    .header p { font-size: 13px; color: #888; margin-top: 4px; }
+    .date-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .date-nav button { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 6px 14px; font-size: 14px; cursor: pointer; color: #333; }
+    .date-nav button:hover { background: #f5f5f5; }
+    .date-label { font-size: 15px; font-weight: 500; color: #222; }
+    .input-card { background: white; border: 1px solid #eee; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+    .input-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .input-row input { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: #f9f9f9; color: #333; }
+    .input-row button { padding: 8px 14px; background: white; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; cursor: pointer; color: #333; white-space: nowrap; }
+    .input-row button:hover { background: #f5f5f5; }
+    .comment-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+    .comment-row textarea { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; font-family: sans-serif; background: #f9f9f9; color: #333; resize: none; height: 60px; }
+    .save-btn { margin-top: 8px; width: 100%; padding: 8px; background: white; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; cursor: pointer; color: #333; }
+    .save-btn:hover { background: #f5f5f5; }
+    .section-title { font-size: 13px; color: #888; margin-bottom: 8px; }
+    .task-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: white; border: 1px solid #eee; border-radius: 8px; margin-bottom: 6px; }
+    .task-item .check { font-size: 18px; color: #1D9E75; }
+    .task-text { flex: 1; font-size: 14px; color: #333; }
+    .task-del { font-size: 14px; color: #bbb; cursor: pointer; border: none; background: none; padding: 2px 6px; }
+    .task-del:hover { color: #e74c3c; }
+    .comment-display { background: #f5f5f5; border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 13px; color: #666; font-style: italic; }
+    .empty { text-align: center; padding: 2rem 0; color: #bbb; font-size: 14px; }
+    .count-badge { display: inline-block; background: #E1F5EE; color: #0F6E56; font-size: 12px; padding: 2px 8px; border-radius: 99px; margin-left: 6px; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>✅ Didリスト</h1>
+    <p>今日やったことを記録しよう</p>
+  </div>
+
+  <div class="date-nav">
+    <button onclick="changeDate(-1)">＜</button>
+    <span class="date-label" id="dateLabel"></span>
+    <button onclick="changeDate(1)">＞</button>
+  </div>
+
+  <div class="input-card">
+    <div class="input-row">
+      <input type="text" id="taskInput" placeholder="やったことを入力..." />
+      <button onclick="addTask()">＋ 追加</button>
+    </div>
+    <div class="comment-label">振り返りコメント</div>
+    <div class="comment-row">
+      <textarea id="commentInput" placeholder="今日を振り返って一言..."></textarea>
+    </div>
+    <button class="save-btn" onclick="saveComment()">コメントを保存</button>
+  </div>
+
+  <div class="tasks-section">
+    <div class="section-title" id="taskCount">やったこと</div>
+    <div id="taskList"></div>
+  </div>
+</div>
+
+<script>
+  let data = JSON.parse(localStorage.getItem('didlist') || '{}');
+  let currentDate = new Date();
+
+  function save() {
+    localStorage.setItem('didlist', JSON.stringify(data));
+  }
+
+  function dateKey(d) {
+    return d.toISOString().slice(0, 10);
+  }
+
+  function formatDate(d) {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const dk = dateKey(d);
+    if (dk === dateKey(today)) return '今日 ' + d.toLocaleDateString('ja-JP', {month:'long', day:'numeric'});
+    if (dk === dateKey(yesterday)) return '昨日 ' + d.toLocaleDateString('ja-JP', {month:'long', day:'numeric'});
+    return d.toLocaleDateString('ja-JP', {year:'numeric', month:'long', day:'numeric'});
+  }
+
+  function getDay() {
+    const k = dateKey(currentDate);
+    if (!data[k]) data[k] = { tasks: [], comment: '' };
+    return data[k];
+  }
+
+  function render() {
+    const day = getDay();
+    document.getElementById('dateLabel').textContent = formatDate(currentDate);
+    document.getElementById('commentInput').value = day.comment;
+    const count = day.tasks.length;
+    document.getElementById('taskCount').innerHTML = 'やったこと' + (count > 0 ? `<span class="count-badge">${count}件</span>` : '');
+    const list = document.getElementById('taskList');
+    if (day.tasks.length === 0) {
+      list.innerHTML = '<div class="empty">まだ記録がありません</div>';
+      return;
+    }
+    list.innerHTML = day.tasks.map((t, i) => `
+      <div class="task-item">
+        <span class="check">✅</span>
+        <span class="task-text">${t}</span>
+        <button class="task-del" onclick="deleteTask(${i})">✕</button>
+      </div>
+    `).join('');
+    if (day.comment) {
+      list.innerHTML += `<div class="comment-display">💬 ${day.comment}</div>`;
+    }
+  }
+
+  function addTask() {
+    const input = document.getElementById('taskInput');
+    const text = input.value.trim();
+    if (!text) return;
+    getDay().tasks.push(text);
+    input.value = '';
+    save();
+    render();
+  }
+
+  function deleteTask(i) {
+    getDay().tasks.splice(i, 1);
+    save();
+    render();
+  }
+
+  function saveComment() {
+    getDay().comment = document.getElementById('commentInput').value.trim();
+    save();
+    render();
+  }
+
+  function changeDate(d) {
+    const nd = new Date(currentDate);
+    nd.setDate(nd.getDate() + d);
+    const today = new Date();
+    if (nd > today) return;
+    currentDate = nd;
+    render();
+  }
+
+  document.getElementById('taskInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addTask();
+  });
+
+  render();
+</script>
+</body>
+</html>
